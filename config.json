@@ -1,0 +1,112 @@
+{
+  "_说明": "仿真台配置。连接参数（Platform、租户、账号）是假值，设备、耗材、流程是占位值，拿到现场的“统一连接配置和已冻结登记的参数”后照着改。各字段含义见 详细说明.md 第 7 节。",
+  "server": {
+    "host": "0.0.0.0",
+    "labillionPort": 8080,
+    "railPort": 40000,
+    "consolePort": 8090,
+    "labillionCertFile": "",
+    "labillionKeyFile": ""
+  },
+  "task1": {
+    "runName": "MEGA_STEP_TEST",
+    "process": "MEGA_STEP_TEST",
+    "timeLimitMinutes": 30
+  },
+  "labillion": {
+    "platform": "5e2c7a91-3f4b-4d8e-a6c0-9b1d2f7e8a43",
+    "platformName": "仿真工作站",
+    "tenantId": "1000000000000000001",
+    "users": [
+      {"userName": "agent@example.com", "password": "sim123456"}
+    ],
+    "successCode": 200,
+    "strictHeaders": true,
+    "tokenTtlMinutes": 120,
+    "rateLimitPerSecond": 20,
+    "onlineSeconds": 3,
+    "stopSeconds": 2,
+    "labwareSeqStart": 877,
+    "dataPushUrl": "",
+    "devices": [
+      {"name": "智昌机械臂", "manufacturer": "Precise", "productModel": "PF400", "type": "Labware Handler",
+       "locations": ["智昌机械臂:Labware Handler:Nest01"]},
+      {"name": "高内涵", "manufacturer": "Sim", "productModel": "HCS-SIM", "type": "Imager",
+       "locations": ["高内涵:Imager:Nest01"]},
+      {"name": "Carousel 1", "manufacturer": "Megarobo", "productModel": "Carousel-SIM", "type": "Storage",
+       "locations": ["Carousel 1:Tower 1:Nest01", "Carousel 1:Tower 1:Nest02", "Carousel 1:Tower 1:Nest03",
+                     "Carousel 1:Tower 1:Nest04", "Carousel 1:Tower 2:Nest15", "Carousel 1:Tower 2:Nest16"]},
+      {"name": "Carousel 2", "manufacturer": "Megarobo", "productModel": "Carousel-SIM", "type": "Storage",
+       "locations": ["Carousel 2:Tower 3:Nest01", "Carousel 2:Tower 3:Nest02", "Carousel 2:Tower 3:Nest03",
+                     "Carousel 2:Tower 3:Nest04"]}
+    ],
+    "labwareTypes": [
+      {"name": "384 Deep Well Microplate", "category": "Plate", "manufacturer": "bbbb", "catNo": "c",
+       "length": "127.76", "width": "85.48", "height": "25", "rowNumber": "16", "columnNumber": "24",
+       "allowLidTypes": ["PCR Plate Lid", "Microplate Lid"]},
+      {"name": "384 Well Microplate", "category": "Plate", "manufacturer": "Sim", "catNo": "SIM-384",
+       "length": "127.76", "width": "85.48", "height": "14.4", "rowNumber": "16", "columnNumber": "24",
+       "allowLidTypes": ["Microplate Lid"]},
+      {"name": "96 Well Microplate", "category": "Plate", "manufacturer": "Sim", "catNo": "SIM-96",
+       "length": "127.76", "width": "85.48", "height": "14.6", "rowNumber": "8", "columnNumber": "12",
+       "allowLidTypes": ["Microplate Lid"]},
+      {"name": "Microplate Lid", "category": "Lid", "manufacturer": "Sim", "catNo": "SIM-LID",
+       "length": "127.76", "width": "85.48", "height": "7", "rowNumber": "0", "columnNumber": "0",
+       "allowLidTypes": []},
+      {"name": "PCR Plate Lid", "category": "Lid", "manufacturer": "Sim", "catNo": "SIM-PCR-LID",
+       "length": "127.76", "width": "85.48", "height": "5", "rowNumber": "0", "columnNumber": "0",
+       "allowLidTypes": []}
+    ],
+    "initialLabwares": [
+      {"labwareType": "384 Well Microplate", "label": "plate", "seq": 356, "location": "Carousel 2:Tower 3:Nest01"},
+      {"labwareType": "96 Well Microplate", "label": "plate", "seq": 357, "location": "Carousel 2:Tower 3:Nest02",
+       "lidType": "Microplate Lid"}
+    ],
+    "processes": [
+      {"name": "MEGA_STEP_TEST", "owner": "megarobo", "creationTime": "2026-11-20T10:00:00.000000",
+       "comment": "任务1 设备接入测试流程（仿真占位）", "isValid": "True", "variables": null, "producesData": true,
+       "steps": [
+         {"device": "智昌机械臂", "action": "Move Labware", "seconds": 20},
+         {"device": "高内涵", "action": "Read Plate", "seconds": 60},
+         {"device": "智昌机械臂", "action": "Move Labware", "seconds": 20}
+       ]},
+      {"name": "Process9", "owner": "megarobo", "creationTime": "2025-12-20T09:00:00.000000",
+       "comment": null, "isValid": "True", "variables": null, "producesData": false,
+       "steps": [{"device": "智昌机械臂", "action": "Move Labware", "seconds": 15}]},
+      {"name": "Process58", "owner": "megarobo", "creationTime": "2025-12-21T09:00:00.000000",
+       "comment": null, "isValid": "True", "variables": null, "producesData": false,
+       "steps": [{"device": "智昌机械臂", "action": "Move Labware", "seconds": 10},
+                 {"device": "高内涵", "action": "Read Plate", "seconds": 20}]},
+      {"name": "test-process", "owner": "megarobo", "creationTime": "2025-12-22T09:00:00.000000",
+       "comment": null, "isValid": "True", "variables": null, "producesData": false,
+       "steps": [{"device": "智昌机械臂", "action": "Move Labware", "seconds": 10}]},
+      {"name": "testgroup_seal4", "owner": "sim", "creationTime": "2025-08-11T16:37:31.628116",
+       "comment": null, "isValid": "True", "variables": null, "producesData": false,
+       "steps": [{"device": "智昌机械臂", "action": "Move Labware", "seconds": 10}]},
+      {"name": "BrokenProcess_demo", "owner": "megarobo", "creationTime": "2026-11-20T10:00:00.000000",
+       "comment": "故意设成不合法，用来测预览/运行的报错", "isValid": "False", "variables": null, "producesData": false,
+       "steps": [{"device": "智昌机械臂", "action": "Move Labware", "seconds": 10}]}
+    ]
+  },
+  "rail": {
+    "deviceId": "1",
+    "positions": [
+      {"cursorIndex": 0, "name": "IN", "label": "收回到位（设备内侧）", "mm": 0},
+      {"cursorIndex": 1, "name": "OUT", "label": "弹出到位（交互位 E1）", "mm": 400}
+    ],
+    "homeIndex": 0,
+    "speedMmPerSecond": 200,
+    "resetSeconds": 3,
+    "settleMs": 500,
+    "arrivalToleranceMm": 1.0,
+    "faultTimeoutSeconds": 10,
+    "faultOffsetMm": 25,
+    "callbackPort": 9100,
+    "callbackBaseUrl": ""
+  },
+  "scene": {
+    "mode": "competition",
+    "robots": ["A", "B"],
+    "objects": ["P01", "P02"]
+  }
+}

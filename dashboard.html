@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>镁伽设备仿真</title>
+<style>
+:root {
+  --desk: #e3e5e8; --chrome: #f4f4f4; --chrome-line: #d2d5d9; --surface: #fff; --line: #ebebea; --head: #f8f8f7;
+  --ink: #1f2124; --ink2: #52514e; --muted: #8a8984; --accent: #e27323; --accent-t: #f8dcc6;
+  --good: #0ca30c; --info: #2f6fdb; --warn: #f2a516; --crit: #d03b3b; --off: #b9b8b2;
+  --b-bg: #1a1a19; --b-raise: #242422; --b-hover: #2b2b28; --b-line: #2e2e2b; --b-line2: #3d3d39;
+  --b-ink: #eeede8; --b-ink2: #bdbcb2; --b-muted: #85847d; --b-accent: #3b7ddd; --b-bad: #f0a29b;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { font: 13px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; color: var(--ink);
+       display: grid; grid-template-columns: minmax(0, 1fr) 500px; overflow: hidden; }
+body.bench-hidden { grid-template-columns: minmax(0, 1fr); }
+body.bench-hidden .bench { display: none; }
+body.bench-hidden .desk { padding-right: 48px; }
+button, select, input { font: inherit; }
+table { width: 100%; border-collapse: collapse; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted { color: var(--muted); }
+.st { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.st i { width: 8px; height: 8px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
+.d-good { background: var(--good); } .d-info { background: var(--info); } .d-warn { background: var(--warn); }
+.d-crit { background: var(--crit); } .d-off { background: var(--off); }
+
+/* ---------- 仿真设备（左） ---------- */
+.desk { overflow: auto; background: var(--desk); padding: 12px 18px 28px; display: flex; flex-direction: column; gap: 14px; }
+.desk-cap { font-size: 12px; color: var(--muted); }
+.win { background: var(--chrome); border: 1px solid var(--chrome-line); border-radius: 6px; overflow: hidden;
+       box-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 18px rgba(0, 0, 0, .04); flex: none; }
+.win-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 0; }
+.win-head b { font-size: 14px; font-weight: 600; }
+.win-head .sub { font-size: 12px; color: var(--muted); }
+.win-head .meta { margin-left: auto; font-size: 12px; color: var(--muted); }
+.win-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px 10px; border-bottom: 1px solid var(--chrome-line); }
+.win-tabs button { min-width: 92px; height: 26px; padding: 0 14px; border: 1px solid #d3d3d3; border-radius: 2px;
+                   background: #fff; color: #333; font-size: 12px; cursor: pointer; }
+.win-tabs button:hover { border-color: #b9b9b9; }
+.win-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.win-tabs .n:not(:empty) { margin-left: 6px; padding: 0 5px; border-radius: 8px; background: var(--crit); color: #fff; font-size: 11px; }
+.win-body { background: var(--surface); padding: 14px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 14px; }
+.tile { padding: 8px 12px; border-left: 1px solid var(--line); min-width: 0; }
+.tile:first-child { border-left: 0; }
+.tile label { display: block; font-size: 12px; color: var(--muted); }
+.tile > div { font-size: 15px; font-weight: 600; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; align-items: start; }
+.grp-t { font-size: 12px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
+.box { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.box.pad { padding: 10px 12px; }
+.win th { font-weight: 500; font-size: 12px; color: var(--muted); text-align: left; padding: 6px 10px; background: var(--head);
+          border-bottom: 1px solid var(--line); white-space: nowrap; }
+.win td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.win tr:last-child td { border-bottom: 0; }
+.win tr.dim td { color: var(--muted); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 16px; }
+.kv > :nth-child(odd) { color: var(--muted); }
+.run-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.run-head .mono { font-size: 13px; font-weight: 600; }
+.meter { display: flex; align-items: center; gap: 10px; margin: 10px 0 12px; }
+.meter > div { flex: 1; height: 4px; border-radius: 2px; background: var(--accent-t); overflow: hidden; }
+.meter > div > div { height: 100%; background: var(--accent); }
+.meter span { font-size: 12px; color: var(--muted); min-width: 34px; text-align: right; }
+.empty { color: var(--muted); padding: 2px 0; }
+.box > .empty { padding: 10px 12px; }
+.banner { padding: 7px 12px; margin-bottom: 12px; border-radius: 4px; background: #fbeceb; color: #9c2a2a; font-size: 12px; }
+.track { position: relative; height: 56px; margin: 4px 44px 12px; }
+.track .rail { position: absolute; left: -34px; right: -34px; top: 18px; height: 6px; border-radius: 3px; background: #dfe0e2; }
+.track .tick { position: absolute; top: 6px; height: 30px; border-left: 1px dashed #bcbdc0; }
+.track .tick-l { position: absolute; top: 38px; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.track .target { position: absolute; top: 2px; height: 38px; border-left: 2px dashed var(--accent); display: none; }
+.track .carriage { position: absolute; top: 10px; width: 48px; height: 22px; margin-left: -24px; border-radius: 3px;
+                   background: var(--accent); transition: left .6s linear; }
+.mt { margin-top: 12px; }
+
+/* ---------- 测试台（右） ---------- */
+.bench { background: var(--b-bg); color: var(--b-ink); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.bench .muted { color: var(--b-muted); }
+.bench .st i { box-shadow: none; }
+.bench .d-off { background: #5d5c57; }
+.b-head { padding: 12px 16px 12px; border-bottom: 1px solid var(--b-line); flex: none; }
+.b-row { display: flex; align-items: center; gap: 8px; }
+.b-title { font-size: 14px; font-weight: 600; }
+.b-time { color: var(--b-muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-left: 6px; }
+.b-time b { color: var(--b-ink); font-weight: 600; }
+.b-time b.over { color: var(--b-bad); }
+.b-stats { display: flex; gap: 26px; margin: 12px 0 12px; }
+.b-stat label { display: block; font-size: 11px; color: var(--b-muted); }
+.b-stat b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.btn { height: 28px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--b-line2); background: var(--b-raise);
+       color: var(--b-ink); cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--b-hover); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--b-accent); border-color: var(--b-accent); color: #fff; }
+.btn.primary:hover { background: #3572cc; }
+.btn.sm { height: 24px; padding: 0 8px; font-size: 12px; }
+.btn.on { border-color: var(--b-ink2); color: #fff; background: #34342f; }
+.ghost { margin-left: auto; background: none; border: 0; color: var(--b-muted); cursor: pointer; font-size: 12px; padding: 2px 4px; }
+.ghost:hover { color: var(--b-ink); }
+.b-tabs { display: flex; padding: 0 8px; border-bottom: 1px solid var(--b-line); flex: none; }
+.b-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--b-ink2); padding: 9px 11px 7px; cursor: pointer; }
+.b-tabs button:hover { color: var(--b-ink); }
+.b-tabs button.on { color: var(--b-ink); border-bottom-color: var(--b-accent); }
+.b-body { flex: 1; min-height: 0; overflow: auto; position: relative; }
+.b-pane { padding: 14px 16px 24px; }
+.b-pane.fill { position: absolute; inset: 0; display: flex; flex-direction: column; padding-bottom: 14px; }
+.b-pane[hidden] { display: none; }
+.bench h4 { font-size: 12px; font-weight: 600; color: var(--b-ink2); margin: 20px 0 8px; display: flex; align-items: baseline; gap: 8px; }
+.bench h4:first-child { margin-top: 0; }
+.bench h4 .r { margin-left: auto; color: var(--b-ink); font-variant-numeric: tabular-nums; }
+.bench th { font-weight: 500; font-size: 12px; color: var(--b-muted); text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--b-line); white-space: nowrap; }
+.bench td { padding: 6px 8px; border-bottom: 1px solid var(--b-line); vertical-align: top; }
+.bench .kv { gap: 6px 14px; }
+.bench .kv > :nth-child(odd) { color: var(--b-muted); }
+.bench select, .bench input[type=text] { height: 28px; padding: 0 8px; border: 1px solid var(--b-line2); border-radius: 4px; background: #121211; color: var(--b-ink); }
+.bench input[type=text] { width: 100%; min-width: 0; }
+.bench label.chk { display: inline-flex; align-items: center; gap: 6px; margin-right: 16px; color: var(--b-ink2); cursor: pointer; }
+.bench a { color: #8ab4f8; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.bench a:hover { text-decoration: underline; }
+.nw td:first-child, .nw td:nth-child(2) { white-space: nowrap; }
+.form { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px 12px; align-items: center; margin-bottom: 12px; }
+.form > label:not(.chk) { color: var(--b-muted); }
+.inline { display: flex; gap: 6px; }
+.console { margin: 0; background: #0f0f0e; border: 1px solid var(--b-line); border-radius: 4px; padding: 8px 10px;
+           font: 12px/1.55 var(--mono); color: #d4d3cb; white-space: pre-wrap; word-break: break-all; overflow: auto; }
+.fill .console.grow { flex: 1; min-height: 0; }
+.status-line { margin: 2px 0 12px; min-height: 20px; }
+.hint { color: var(--b-muted); font-size: 12px; margin-top: 2px; }
+.bad { color: var(--b-bad); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { display: inline-flex; border: 1px solid var(--b-line2); border-radius: 4px; overflow: hidden; }
+.seg button { background: var(--b-raise); border: 0; border-left: 1px solid var(--b-line2); color: var(--b-ink2); height: 26px; padding: 0 10px; cursor: pointer; font-size: 12px; }
+.seg button:first-child { border-left: 0; }
+.seg button.on { background: #3a3a35; color: #fff; }
+/* 手动调用 */
+.m-list { flex: 1; min-height: 0; overflow: auto; margin: 0 -8px; }
+.m-g { font-size: 12px; font-weight: 600; color: var(--b-ink2); padding: 12px 8px 4px; }
+.m-g:first-child { padding-top: 0; }
+.m-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 62px 150px 8px; align-items: center; gap: 8px; width: 100%;
+         padding: 4px 8px; border: 0; border-radius: 4px; background: none; color: var(--b-ink); text-align: left; cursor: pointer; }
+.m-row:hover:not(:disabled) { background: var(--b-hover); }
+.m-row:disabled { opacity: .4; cursor: default; }
+.m-row .n { color: var(--b-muted); text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+.m-row .c { color: var(--b-muted); font-size: 11px; }
+.m-row .p { color: var(--b-muted); font: 11px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-row .ok { width: 6px; height: 6px; border-radius: 50%; }
+.m-row .ok.on { background: var(--good); }
+.m-resp { flex: none; border-top: 1px solid var(--b-line); padding-top: 10px; margin-top: 8px; max-height: 42%; display: flex; flex-direction: column; min-height: 96px; }
+.m-resp .console { flex: 1; min-height: 0; }
+.m-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.m-note { font-size: 12px; color: var(--b-ink2); margin-bottom: 6px; }
+details summary { cursor: pointer; color: var(--b-ink2); font-size: 12px; margin: 10px 0 6px; }
+/* 调用记录 */
+.toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.log td:nth-child(-n+3) { white-space: nowrap; }
+.log td:first-child { color: var(--b-muted); }
+.log td:nth-child(3) { color: var(--b-ink2); }
+.log tr.ev { cursor: pointer; }
+.log tr.ev:hover td { background: #212120; }
+.log tr.flash td { background: #3a3424; }
+.log tr.detail td { background: #151514; }
+.log .k-violation { color: var(--b-bad); }
+.log pre { margin: 4px 0 8px; max-height: 300px; }
+.log .lbl { font-size: 12px; color: var(--b-muted); }
+.bench-open { position: fixed; right: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; padding: 12px 6px;
+              border: 0; border-radius: 4px 0 0 4px; background: #2b2b28; color: #eee; cursor: pointer; display: none; letter-spacing: 2px; }
+body.bench-hidden .bench-open { display: block; }
+#toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 460px; background: #2b2b28; color: #fff;
+         padding: 7px 12px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+#toast.show { opacity: .96; }
+@media (max-width: 1100px) {
+  body { display: block; overflow: auto; height: auto; }
+  .desk { overflow: visible; }
+  .bench { height: 100vh; }
+}
+</style>
+</head>
+<body>
+
+<main class="desk">
+  <div class="desk-cap">仿真设备</div>
+
+  <section class="win">
+    <div class="win-head"><b>Labillion</b><span class="sub" id="lab-sub"></span></div>
+    <nav class="win-tabs" id="lab-tabs">
+      <button data-p="overview">总览</button>
+      <button data-p="devices">设备</button>
+      <button data-p="labware">耗材</button>
+      <button data-p="process">流程</button>
+      <button data-p="alarm">错误与报警<span class="n" id="lab-alarm-n"></span></button>
+    </nav>
+    <div class="win-body" id="lab-body"></div>
+  </section>
+
+  <section class="win">
+    <div class="win-head"><b>RegripStation</b><span class="sub">SBS Linear Module · Auflo-L200-2000</span><span class="meta" id="nuc-meta"></span></div>
+    <nav class="win-tabs" id="nuc-tabs">
+      <button data-p="live">实况</button>
+      <button data-p="points">点位管理</button>
+      <button data-p="config">配置</button>
+      <button data-p="data">数据</button>
+    </nav>
+    <div class="win-body" id="nuc-body"></div>
+  </section>
+</main>
+
+<aside class="bench">
+  <header class="b-head">
+    <div class="b-row"><span class="b-title">测试台</span><span class="b-time" id="b-time"></span>
+      <button class="ghost" id="b-hide">收起</button></div>
+    <div class="b-stats" id="b-stats"></div>
+    <div class="b-row"><button class="btn primary" id="b-run">运行示例智能体</button><button class="btn" id="b-reset">重置</button></div>
+  </header>
+  <nav class="b-tabs" id="b-tabs">
+    <button data-p="demo">示例</button>
+    <button data-p="manual">手动</button>
+    <button data-p="scene">场景</button>
+    <button data-p="score">评分</button>
+    <button data-p="log">记录</button>
+    <button data-p="settings">设置</button>
+  </nav>
+  <div class="b-body">
+    <section class="b-pane fill" data-p="demo">
+      <div class="form">
+        <label for="demo-scn">场景</label>
+        <select id="demo-scn">
+          <option value="all">全部：浦江流程、任务1、交互口 E1</option>
+          <option value="t1">任务1 设备接入</option>
+          <option value="e1">交互口 E1</option>
+          <option value="flow">浦江调用流程</option>
+        </select>
+        <label>选项</label>
+        <div><label class="chk"><input type="checkbox" id="demo-faults">演示故障处理</label><label class="chk"><input type="checkbox" id="demo-async">交互口异步回调</label></div>
+      </div>
+      <div class="status-line" id="demo-st"></div>
+      <pre class="console grow" id="demo-out"></pre>
+    </section>
+
+    <section class="b-pane fill" data-p="manual" hidden>
+      <div class="status-line" id="m-st"></div>
+      <div class="m-list" id="m-list"></div>
+      <div class="m-resp" id="m-resp"><span class="muted">点一行发送对应的接口请求</span></div>
+    </section>
+
+    <section class="b-pane" data-p="scene" hidden><div id="scene"></div></section>
+    <section class="b-pane" data-p="score" hidden><div id="score"></div></section>
+
+    <section class="b-pane" data-p="log" hidden>
+      <div class="toolbar"><div class="seg" id="log-filter"></div><a id="log-export" href="/sim/export" style="margin-left:auto">导出</a></div>
+      <table class="log"><tbody id="log-body"></tbody></table>
+    </section>
+
+    <section class="b-pane" data-p="settings" hidden>
+      <h4>智能体连接</h4>
+      <div class="kv" id="conn"></div>
+      <h4>仿真</h4>
+      <div class="form">
+        <label for="s-mode">模式</label>
+        <select id="s-mode"><option value="competition">比赛规则（交互口空载运动）</option><option value="pujiang">浦江调用流程（滑轨载物进出）</option></select>
+        <label for="s-speed">倍速</label>
+        <select id="s-speed"><option>0.5</option><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option><option>50</option></select>
+        <label for="s-code">成功码</label>
+        <select id="s-code"><option value="200">200</option><option value="0">0</option></select>
+        <label>请求头</label>
+        <label class="chk"><input type="checkbox" id="s-strict">缺 Accept-Language 时报错</label>
+        <label for="s-cb">回调地址</label>
+        <div class="inline"><input type="text" id="s-cb"><button class="btn" data-save="callbackBaseUrl">保存</button></div>
+        <label for="s-push">数据推送</label>
+        <div class="inline"><input type="text" id="s-push"><button class="btn" data-save="dataPushUrl">保存</button></div>
+      </div>
+    </section>
+  </div>
+</aside>
+<button class="bench-open" id="b-open">测试台</button>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const hms = s => s ? String(s).slice(11, 19) : '';
+const hmsms = s => s ? String(s).slice(11, 23) : '';
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const pretty = v => typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+const STATE = {Idle: 'good', Running: 'good', Busy: 'info', Paused: 'warn', Resetting: 'warn', InError: 'crit', Stop: 'off', NotRunning: 'off'};
+const dot = (k, html) => `<span class="st"><i class="d-${k}"></i>${html}</span>`;
+const st = v => dot(STATE[v] || 'off', esc(v));
+const put = (el, html) => { if (el && el.__h !== html) { el.innerHTML = html; el.__h = html; } };
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 无痕模式 */ } },
+};
+const ui = {lab: store.get('tab.lab', 'overview'), nuc: store.get('tab.nuc', 'live'), bench: store.get('tab.bench', 'demo')};
+const VALID = {lab: ['overview', 'devices', 'labware', 'process', 'alarm'], nuc: ['live', 'points', 'config', 'data'],
+               bench: ['demo', 'manual', 'scene', 'score', 'log', 'settings']};
+const q = new URLSearchParams(location.search);  // 例如 /?bench=score&lab=devices 直接打开指定标签页
+for (const k of Object.keys(VALID)) {
+  if (q.get(k)) ui[k] = q.get(k);
+  if (!VALID[k].includes(ui[k])) ui[k] = VALID[k][0];
+}
+let S = null, lastSeq = 0, roundId = null, events = [], logFilter = 'all', openRows = new Set();
+let polling = false, manualBusy = false, preOpen = false, sceneDevice = null;
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function post(path, body) {
+  const r = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
+  const j = await r.json();
+  if (!j.ok) { toast(j.error); return null; }
+  if (typeof j.result === 'string') toast(j.result);
+  poll();
+  return j.result;
+}
+
+// ---------- 标签页 ----------
+function tabs(navId, key, onChange) {
+  const nav = $(navId);
+  const mark = () => nav.querySelectorAll('button[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === ui[key]));
+  nav.addEventListener('click', e => {
+    const b = e.target.closest('button[data-p]');
+    if (!b) return;
+    ui[key] = b.dataset.p; store.set('tab.' + key, ui[key]); mark(); onChange();
+  });
+  mark();
+  return mark;
+}
+const markLab = tabs('lab-tabs', 'lab', () => S && renderLab());
+const markNuc = tabs('nuc-tabs', 'nuc', () => S && renderNuc());
+const markBench = tabs('b-tabs', 'bench', showBench);
+function showBench() {
+  document.querySelectorAll('.b-pane').forEach(p => { p.hidden = p.dataset.p !== ui.bench; });
+  if (S) renderBench();
+}
+function setBench(p) { ui.bench = p; store.set('tab.bench', p); markBench(); showBench(); }
+
+// ---------- Labillion ----------
+function tbl(head, rows, emptyText) {
+  if (!rows.length) return `<div class="box"><div class="empty">${emptyText}</div></div>`;
+  return `<div class="box"><table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+}
+
+function labOverview() {
+  const L = S.labillion, w = L.workcell;
+  const online = L.devices.filter(d => d.state !== 'Stop').length;
+  const count = (n, k) => n ? dot(k, n) : '0';
+  let h = '';
+  if (L.maintenance) h += `<div class="banner">平台维护中，接口暂停服务（503）</div>`;
+  if (L.errors.length) h += `<div class="banner">${esc(L.errors[0].impactedDevice)}：${esc(L.errors[0].errorMessage)}，等待处理</div>`;
+  h += `<div class="tiles">
+    <div class="tile"><label>运行状态</label><div>${st(w.runState)}</div></div>
+    <div class="tile"><label>错误</label><div>${count(L.errors.length, 'crit')}</div></div>
+    <div class="tile"><label>报警</label><div>${count(L.warnings.length, 'warn')}</div></div>
+    <div class="tile"><label>在线设备</label><div class="num">${online} / ${L.devices.length}</div></div></div>`;
+  const devs = L.devices.map(d => `<tr><td>${esc(d.name)}</td><td class="muted">${esc(d.type)}</td><td>${st(d.state)}</td></tr>`);
+  h += `<div class="cols"><div><div class="grp-t">当前运行</div>${runBlock(w.run, L.internal)}</div>
+        <div><div class="grp-t">设备</div>${tbl(['名称', '类型', '状态'], devs, '无设备')}</div></div>`;
+  return h;
+}
+
+function runBlock(run, i) {
+  if (!run || !i) return `<div class="box"><div class="empty">无运行记录</div></div>`;
+  const active = i.status === 'running' || i.status === 'stopping';
+  const head = {
+    running: i.blockedByError ? ['crit', '等待错误处理'] : i.paused ? ['warn', '已暂停'] : ['good', '运行中'],
+    stopping: ['warn', '终止中'], completed: ['off', '已完成'], stopped: ['off', '已终止'], aborted: ['crit', '已中止'],
+  }[i.status];
+  const label = {done: '完成', pending: '等待', skipped: '未执行', stopped: i.status === 'aborted' ? '已中止' : '已终止',
+                 active: i.blockedByError ? '等待处理' : i.paused ? '已暂停' : '进行中'};
+  let h = `<div class="box pad"><div class="run-head"><span class="mono">${esc(run.name)}</span>${dot(head[0], head[1])}</div>
+    <div class="kv"><span>开始</span><span class="num">${esc(run.startTime)}</span>
+    <span>${active ? '预计结束' : '结束'}</span><span class="num">${esc(run.endTime)}</span>
+    ${active ? `<span>当前步骤</span><span>${esc(i.step)}</span>` : ''}</div>`;
+  if (i.status === 'running' && i.progress !== null) {
+    const pct = Math.round(i.progress * 100);
+    h += `<div class="meter"><div><div style="width:${pct}%"></div></div><span class="num">${pct}%</span></div>`;
+  } else h += `<div class="mt"></div>`;
+  const rows = run.iterations.map((x, k) => {
+    const s = (i.iterStates || [])[k] || 'pending';
+    return `<tr class="${s === 'pending' || s === 'skipped' ? 'dim' : ''}"><td class="num">${esc(x.iterationId)}</td><td class="mono">${esc(x.process)}</td>
+      <td class="num">${hms(x.startTime) || '—'}</td><td class="num">${hms(x.endTime) || '—'}</td><td>${label[s]}</td></tr>`;
+  });
+  h += `<table><thead><tr><th>通量</th><th>流程</th><th>开始</th><th>结束</th><th>状态</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  return h;
+}
+
+function labDevices() {
+  return tbl(['名称', '类型', '厂商', '型号', '板位', '状态'], S.labillion.devices.map(d =>
+    `<tr><td>${esc(d.name)}</td><td>${esc(d.type)}</td><td>${esc(d.manufacturer)}</td><td>${esc(d.productModel)}</td>
+     <td class="num" title="${esc(d.locations.join('\n'))}">${d.locations.length}</td><td>${st(d.state)}</td></tr>`), '无设备');
+}
+
+function labLabware() {
+  return tbl(['名称', '类型', '位置', '条码', '使用中', 'UUID'], S.labillion.labwares.map(lw =>
+    `<tr><td class="mono">${esc(lw.labwareName)}</td><td>${esc(lw.labwareType)}</td><td>${esc(lw.location)}</td>
+     <td class="mono">${esc(lw.barcode) || '—'}</td><td>${lw.inUse === 'True' ? '是' : '否'}</td>
+     <td class="mono muted" title="${esc(lw.uuid)}">${esc(lw.uuid.slice(0, 8))}</td></tr>`), '无耗材');
+}
+
+function labProcess() {
+  return tbl(['名称', '创建者', '创建时间', '合法', '步骤', '时长'], S.labillion.processes.map(p =>
+    `<tr><td class="mono">${esc(p.name)}</td><td>${esc(p.owner)}</td><td class="num">${esc(String(p.creationTime).replace('T', ' ').slice(0, 19))}</td>
+     <td>${p.isValid === 'True' ? '是' : '否'}</td><td class="num">${p.steps}</td><td class="num">${p.seconds} s</td></tr>`), '无流程');
+}
+
+function labAlarm() {
+  const L = S.labillion;
+  const errs = L.errors.map(e => `<tr><td class="num">${esc(e.impactedIteration)}</td><td>${esc(e.impactedDevice)}</td>
+    <td class="mono">${esc(e.impactedLabwares) || '—'}</td><td>${esc(e.errorMessage)}</td><td>${esc(JSON.parse(e.handleOptions).join(' / '))}</td></tr>`);
+  const warns = L.warnings.map(w => `<tr><td>${esc(w.impactedDevice)}</td><td class="mono">${esc(w.impactedLabwares) || '—'}</td><td>${esc(w.warningMessage)}</td></tr>`);
+  return `<div class="grp-t">错误</div>${tbl(['通量', '设备', '耗材', '信息', '处理选项'], errs, '无错误')}
+    <div class="grp-t mt">报警</div>${tbl(['设备', '耗材', '信息'], warns, '无报警')}`;
+}
+
+const LAB = {overview: labOverview, devices: labDevices, labware: labLabware, process: labProcess, alarm: labAlarm};
+function renderLab() {
+  put($('lab-sub'), esc(S.config.platformName || S.config.platform));
+  const n = S.labillion.errors.length + S.labillion.warnings.length;
+  $('lab-alarm-n').textContent = n || '';
+  put($('lab-body'), LAB[ui.lab]());
+}
+
+// ---------- RegripStation（交互口 NUC 驱动） ----------
+// 实况页的滑轨图只建一次，之后只改滑块位置，滑块能平滑移动
+function railPct(mm) {
+  const v = S.config.positions.map(p => Number(p.mm)), lo = Math.min(...v), hi = Math.max(...v);
+  return (hi === lo ? 0 : (Number(mm) - lo) / (hi - lo)) * 100;
+}
+function buildTrack() {
+  let h = '<div class="rail"></div>';
+  for (const p of S.config.positions) {
+    h += `<div class="tick" style="left:${railPct(p.mm)}%"></div><div class="tick-l" style="left:${railPct(p.mm)}%">${esc(p.name)} · ${p.mm} mm</div>`;
+  }
+  $('nl-track').innerHTML = h + `<div class="target"></div><div class="carriage" style="left:${railPct(S.rail.sensor.positionMm)}%"></div>`;
+}
+function updateTrack() {
+  const tr = $('nl-track'), task = S.rail.task, target = task && S.config.positions.find(p => p.name === task.target);
+  tr.querySelector('.carriage').style.left = railPct(S.rail.sensor.positionMm) + '%';
+  const t = tr.querySelector('.target');
+  t.style.display = target ? 'block' : 'none';
+  if (target) t.style.left = railPct(target.mm) + '%';
+}
+
+function liveTiles() {
+  const R = S.rail, sn = R.sensor;
+  const motion = sn.moving ? '运动中' : sn.static ? '静止' : '稳定中';
+  return `<div class="tiles">
+    <div class="tile"><label>状态</label><div>${st(R.state)}</div></div>
+    <div class="tile"><label>位置</label><div class="num">${Number(sn.positionMm).toFixed(1)} mm</div></div>
+    <div class="tile"><label>点位</label><div>${esc(sn.at || '—')}</div></div>
+    <div class="tile"><label>运动</label><div>${motion}</div></div></div>`;
+}
+
+function liveKv() {
+  const R = S.rail, L = R.last;
+  const last = L ? `${dot(L.status === 0 ? 'good' : L.status === 2 ? 'warn' : 'crit', esc(L.cmd + (L.target ? ' → ' + L.target : '')))}
+      <span class="muted">　${esc(L.code)} ${esc(L.message)}${L.duration != null ? ` · ${L.duration} ms` : ''} · ${hms(L.time)}</span>` : '—';
+  const rows = [['当前指令', R.task ? `${esc(R.task.cmd)} → ${esc(R.task.target)}<span class="muted">　${R.task.sync ? '同步' : '异步'}</span>` : '—'],
+                ['上次结果', last]];
+  if (R.pausedFrom) rows.push(['暂停前', esc(R.pausedFrom)]);
+  if (R.error) rows.push(['待处理错误', `<span class="mono">${esc(R.error.eventId)}</span><span class="muted">　${R.error.handle.length ? esc(R.error.handle.join(' / ')) : '只能 Reset'}</span>`]);
+  return `<div class="kv">${rows.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('')}</div>`;
+}
+
+function nucPoints() {
+  return tbl(['索引', '名称', '位置', '说明'], S.config.positions.map(p =>
+    `<tr><td class="num">${p.cursorIndex}</td><td>${esc(p.name)}</td><td class="num">${p.mm} mm</td><td>${esc(p.label)}</td></tr>`), '无点位');
+}
+
+function nucConfig() {
+  const c = S.config, r = c.rail;
+  const grp = (t, kv) => `<div><div class="grp-t">${t}</div><div class="box pad"><div class="kv">${kv.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('')}</div></div></div>`;
+  return `<div class="cols">${grp('常规', [['模拟模式', '是'], ['语言', '中文（简体）']])}
+    ${grp('服务', [['服务端口', c.ports.railPort]])}
+    ${grp('设备', [['设备 ID', esc(c.railDeviceId)], ['速度', `${r.speed} mm/s`], ['到位容差', `${r.tolerance} mm`], ['复位用时', `${r.resetSeconds} s`]])}</div>`;
+}
+
+function nucData() {
+  const rows = [];
+  for (let k = events.length - 1; k >= 0 && rows.length < 80; k--) {
+    const e = events[k];
+    if (!(e.kind === 'rail' || (e.kind === 'rail_result' && e.via === '回调')) || !e.resp) continue;
+    const r = e.resp, how = e.kind === 'rail_result' ? '回调' : e.sync === true ? '同步' : e.sync === false ? '异步' : '—';
+    rows.push(`<tr><td class="num">${hmsms(e.time)}</td><td>${esc(e.cmd)}</td><td>${how}</td>
+      <td>${dot(r.ExecuteStatus === 0 ? 'good' : r.ExecuteStatus === 2 ? 'warn' : 'crit', esc(r.ExecuteStatus))}</td>
+      <td class="mono">${esc(r.ResultCode)}</td><td>${esc(r.Message)}${r.Data != null ? `<span class="muted"> · ${esc(r.Data)}</span>` : ''}</td></tr>`);
+  }
+  return tbl(['时间', '指令', '方式', '状态', '结果码', '信息'], rows, '暂无指令');
+}
+
+const NUC = {points: nucPoints, config: nucConfig, data: nucData};
+function renderNuc() {
+  put($('nuc-meta'), `设备 ID ${esc(S.config.railDeviceId)}`);
+  const body = $('nuc-body');
+  if (ui.nuc !== 'live') { put(body, NUC[ui.nuc]()); return; }
+  if (!$('nl-track')) {
+    body.innerHTML = '<div id="nl-tiles"></div><div class="track" id="nl-track"></div><div id="nl-kv"></div>';
+    body.__h = null;
+    buildTrack();
+  }
+  put($('nl-tiles'), liveTiles());
+  updateTrack();
+  put($('nl-kv'), liveKv());
+}
+
+// ---------- 测试台：顶部 ----------
+function renderHead() {
+  const r = S.round, c = S.checks;
+  put($('b-time'), `本轮 ${hms(r.start)} 开始　<b class="${r.elapsed > r.limit ? 'over' : ''}">${mmss(r.elapsed)}</b> / ${mmss(r.limit)}`);
+  const n = arr => arr.filter(x => x.pass).length;
+  put($('b-stats'), [['任务1', `${c.score.official} / ${c.score.officialTotal}`], ['B-L', `${n(c.bl)} / ${c.bl.length}`],
+                     ['B-C', `${n(c.bc)} / ${c.bc.length}`], ['联锁违规', S.scene.violations.length]]
+    .map(([k, v]) => `<div class="b-stat"><label>${k}</label><b>${v}</b></div>`).join(''));
+  const run = $('b-run'), going = S.demo.running;
+  run.textContent = going ? '停止示例' : '运行示例智能体';
+  run.classList.toggle('primary', !going);
+}
+
+// ---------- 示例智能体 ----------
+let demoShown = '';
+function renderDemo() {
+  const d = S.demo;
+  let s;
+  if (d.running) s = dot('info', `正在运行：${esc(d.name)}`);
+  else if (d.rc === null || d.rc === undefined) s = '<span class="muted">未运行</span>';
+  else if (d.stopped) s = dot('warn', `已停止：${esc(d.name)}`);
+  else s = d.rc === 0 ? dot('good', `完成，全部通过：${esc(d.name)}`) : dot('crit', `完成，有未通过的：${esc(d.name)}`);
+  put($('demo-st'), s);
+  const text = d.lines.join('\n') || '示例智能体的输出';
+  if (text !== demoShown) {
+    const out = $('demo-out'), atEnd = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent = text; demoShown = text;
+    out.classList.toggle('muted', !d.lines.length);
+    if (atEnd) out.scrollTop = out.scrollHeight;
+  }
+}
+function startDemo() {
+  setBench('demo');
+  post('/sim/demo', {scenario: $('demo-scn').value, faults: $('demo-faults').checked, async: $('demo-async').checked});
+}
+
+// ---------- 手动调用 ----------
+const STEPS = [
+  {g: '任务1 · Labillion'},
+  {t: 'labillion', a: 'login', l: '登录', p: 'POST /login', c: '推测-01'},
+  {t: 'labillion', a: 'devices', l: '查询设备', p: 'GET /devices', c: '推测-02'},
+  {t: 'labillion', a: 'online', l: '上线设备', p: 'POST /onlinedevices', c: '推测-03'},
+  {t: 'labillion', a: 'devicestates', l: '查询设备状态', p: 'GET /devicestates', c: '推测-04'},
+  {t: 'labillion', a: 'labwaretypes', l: '查询耗材类型', p: 'GET /labwaretypes', c: '推测-05'},
+  {t: 'labillion', a: 'load', l: '加载耗材', p: 'POST /lhdlabwares', c: '推测-06'},
+  {t: 'labillion', a: 'labwares', l: '查询耗材', p: 'GET /labwares', c: '推测-07'},
+  {t: 'labillion', a: 'processdesigns', l: '查询流程', p: 'GET /processdesigns', c: '推测-08'},
+  {t: 'labillion', a: 'preview', l: '预览', p: 'POST /preview', c: '推测-09'},
+  {t: 'labillion', a: 'workcellstate', l: '查询平台状态', p: 'GET /workcellstate', c: '推测-10'},
+  {t: 'labillion', a: 'run', l: '运行', p: 'POST /run', c: '推测-11'},
+  {t: 'labillion', a: 'workcellstate', l: '查询平台状态', p: 'GET /workcellstate', c: 'T1-B-13'},
+  {t: 'labillion', a: 'pause', l: '暂停', p: 'POST /pause', c: 'T1-B-14'},
+  {t: 'labillion', a: 'continue', l: '继续', p: 'POST /continue', c: 'T1-B-15'},
+  {t: 'labillion', a: 'stop', l: '终止', p: 'POST /stop', c: 'T1-B-16'},
+  {t: 'labillion', a: 'workcellstate', l: '查询平台状态', p: 'GET /workcellstate', c: 'T1-B-17'},
+  {t: 'labillion', a: 'unload', l: '卸载耗材', p: 'DELETE /lhdlabwares', c: 'T1-B-18'},
+  {t: 'labillion', a: 'labwares', l: '查询耗材', p: 'GET /labwares', c: 'T1-B-19'},
+  {t: 'labillion', a: 'offline', l: '下线设备', p: 'POST /offlinedevices', c: 'T1-B-20'},
+  {g: '错误与容错'},
+  {t: 'labillion', a: 'errors', l: '查询错误', p: 'GET /errors', c: '推测-12'},
+  {t: 'labillion', a: 'warnings', l: '查询报警', p: 'POST /warnings'},
+  {t: 'labillion', a: 'Retry', l: '容错：重试', p: 'POST /handleerror'},
+  {t: 'labillion', a: 'Ignore', l: '容错：忽略', p: 'POST /handleerror'},
+  {t: 'labillion', a: 'Abort', l: '容错：中止', p: 'POST /handleerror'},
+  {g: '交互口 NUC'},
+  {t: 'rail', a: 'Reset', l: '上线', p: 'Reset'},
+  {t: 'rail', a: 'GetState', l: '查询状态', p: 'GetState'},
+  {t: 'rail', a: 'OUT', l: '移动到 OUT', p: 'SlideByCursorIndex'},
+  {t: 'rail', a: 'IN', l: '移动到 IN', p: 'SlideByCursorIndex'},
+  {t: 'rail', a: 'Camera', l: '相机核验到位', p: 'GET /sim/port'},
+  {t: 'rail', a: 'Pause', l: '暂停', p: 'Pause'},
+  {t: 'rail', a: 'Continue', l: '继续', p: 'Continue'},
+  {t: 'rail', a: 'Abort', l: '终止', p: 'Abort'},
+  {t: 'rail', a: 'Retry', l: '重试', p: 'Retry'},
+  {t: 'rail', a: 'Ignore', l: '忽略', p: 'Ignore'},
+  {t: 'rail', a: 'Close', l: '下线', p: 'Close'},
+];
+const NOTES = {online: '设备约 3 秒后变为 Idle', pause: '暂停后 runState 仍为 Running', stop: '约 2 秒后变为 NotRunning'};
+
+function buildManual() {
+  let n = 0, h = '';
+  STEPS.forEach((s, k) => {
+    if (s.g) { h += `<div class="m-g">${s.g}</div>`; return; }
+    const num = s.c && s.t === 'labillion' && k <= 20 ? ++n : '';
+    const ck = s.c && s.c.startsWith('T1-B') ? s.c : '';
+    h += `<button class="m-row" data-k="${k}"><span class="n">${num}</span><span>${s.l}</span><span class="c">${ck}</span>
+          <span class="p">${s.p}</span><i class="ok" data-c="${s.c || ''}"></i></button>`;
+  });
+  $('m-list').innerHTML = h;
+}
+
+function renderManual() {
+  const off = manualBusy || S.demo.running;
+  document.querySelectorAll('.m-row').forEach(b => { b.disabled = off; });
+  const passed = new Set([...S.checks.official, ...S.checks.pre].filter(x => x.pass).map(x => x.id));
+  document.querySelectorAll('.m-row .ok').forEach(i => i.classList.toggle('on', !!i.dataset.c && passed.has(i.dataset.c)));
+  put($('m-st'), S.demo.running ? dot('info', '示例智能体运行中，手动调用暂停使用')
+    : S.manual.loggedIn ? dot('good', '已登录') : dot('off', '未登录'));
+}
+
+$('m-list').addEventListener('click', async e => {
+  const b = e.target.closest('.m-row');
+  if (!b || b.disabled) return;
+  const s = STEPS[Number(b.dataset.k)];
+  manualBusy = true; renderManual();
+  put($('m-resp'), `<span class="muted">${esc(s.l)}：已发送，等待响应</span>`);
+  try {
+    const r = await fetch('/sim/manual', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({target: s.t, action: s.a})});
+    const j = await r.json();
+    if (!j.ok) put($('m-resp'), `<div class="m-head">${dot('warn', '未发送')}</div><div class="m-note">${esc(j.error)}</div>`);
+    else showManual(s, j.result);
+  } catch (err) {
+    put($('m-resp'), `<div class="m-head">${dot('crit', '连不上仿真台')}</div>`);
+  } finally { manualBusy = false; poll(); }
+});
+
+function showManual(s, x) {
+  const resp = x.response, path = x.request.url.replace(/^https?:\/\/[^/]+/, '');
+  if (s.a === 'Camera') {
+    put($('m-resp'), `<div class="m-head">${dot(resp.atAndStatic ? 'good' : 'warn', resp.atAndStatic ? '到位静止：' + esc(resp.atAndStatic) : '没有在点位上停稳')}<span class="mono">GET /sim/port</span></div>`
+      + `<pre class="console">${esc(pretty(resp))}</pre>`);
+    return;
+  }
+  const ok = s.t === 'labillion' ? x.status === 200 && resp && resp.code === S.settings.successCode : resp && resp.ExecuteStatus === 0;
+  const what = s.t === 'rail' ? `${esc(x.request.body.Command)}${x.request.body.Parameters && 'CursorIndex' in x.request.body.Parameters ? ' · CursorIndex ' + x.request.body.Parameters.CursorIndex : ''}` : esc(x.request.method + ' ' + path);
+  let note = ok ? (NOTES[s.a] || '') : esc((resp && (resp.message || resp.Message)) || '');
+  put($('m-resp'), `<div class="m-head">${dot(ok ? 'good' : 'crit', ok ? '成功' : '失败')}<span class="mono">${what}</span><span class="muted">HTTP ${esc(x.status)}</span></div>`
+    + (note ? `<div class="m-note${ok ? '' : ' bad'}">${note}</div>` : '')
+    + `<pre class="console">${esc(pretty(resp))}</pre>`);
+}
+
+// ---------- 场景 ----------
+function renderScene() {
+  const sc = S.scene, sn = S.rail.sensor, L = S.labillion, R = S.rail;
+  const cam = `${Number(sn.positionMm).toFixed(1)} mm · ${sn.at ? esc(sn.at) : '不在点位'} · ${sn.moving ? '运动中' : sn.static ? '静止' : '稳定中'}`;
+  let h = `<h4>交互口 E1</h4><div class="kv"><span>托盘</span><span>${sc.e1 ? esc(sc.e1) : '空'}</span><span>仿真相机</span><span class="num">${cam}</span></div>`;
+  h += `<h4>机器人</h4><table><tbody>` + Object.entries(sc.robots).map(([k, r]) =>
+    `<tr><td style="width:24px"><b>${esc(k)}</b></td><td>${r.inZone ? dot('warn', '运动区内') : dot('off', '运动区外')}</td><td>${r.holding ? esc(r.holding) : '<span class="muted">空手</span>'}</td>
+     <td style="text-align:right"><div class="btns" style="justify-content:flex-end">${[['enter', '进入'], ['place', '放置'], ['take', '取回'], ['exit', '退出'], ['deliver', '送达']]
+       .map(([a, t]) => `<button class="btn sm" data-robot="${esc(k)}" data-action="${a}">${t}</button>`).join('')}</div></td></tr>`).join('') + `</tbody></table>`;
+  const v = sc.violations;
+  h += `<h4>联锁违规<span class="r">${v.length}</span></h4>`
+    + v.slice(-5).reverse().map(x => `<div class="hint"><span class="num">${hms(x.time)}</span>　${esc(x.rule)}：${esc(x.detail)}</div>`).join('');
+  if (!sceneDevice || !L.devices.some(d => d.name === sceneDevice)) sceneDevice = L.devices.length ? L.devices[0].name : null;
+  const dev = L.devices.find(d => d.name === sceneDevice);
+  h += `<h4>注入故障 · Labillion</h4><div class="btns">
+      <button class="btn sm" data-fault='{"target":"labillion","kind":"error"}'>流程错误</button>
+      <button class="btn sm" data-fault='{"target":"labillion","kind":"error","options":["Retry","Abort"]}'>流程错误（仅 Retry / Abort）</button>
+      <button class="btn sm" data-fault='{"target":"labillion","kind":"warning"}'>报警</button>
+      <button class="btn sm" data-fault='{"target":"labillion","kind":"clearWarnings"}'>清除报警</button>
+      <button class="btn sm" data-fault='{"target":"labillion","kind":"timeout"}'>下一次请求 408</button>
+      <button class="btn sm" data-fault='{"target":"labillion","kind":"serverError"}'>下一次请求 500</button>
+      <button class="btn sm ${L.maintenance ? 'on' : ''}" data-fault='{"target":"labillion","kind":"maintenance","on":${!L.maintenance}}'>维护 503${L.maintenance ? '：开' : ''}</button></div>
+    <div class="inline mt"><select id="scene-dev">${L.devices.map(d => `<option${d.name === sceneDevice ? ' selected' : ''}>${esc(d.name)}</option>`).join('')}</select>
+      ${dev ? `<button class="btn sm" data-fault='${esc(JSON.stringify({target: 'labillion', kind: 'deviceFault', device: dev.name, on: !dev.fault}))}'>${dev.fault ? '解除设备故障' : '设备故障'}</button>` : ''}</div>`;
+  const f = R.fault || '';
+  h += `<h4>注入故障 · 交互口下一次移动</h4><div class="seg">${[['', '无'], ['error', '中途报错'], ['timeout', '卡住超时'], ['offset', '报成功但未到位'], ['lostcontrol', '失控'], ['estop', '急停']]
+    .map(([k, t]) => `<button class="${f === k ? 'on' : ''}" data-fault='{"target":"rail","kind":"${k || 'clear'}"}'>${t}</button>`).join('')}</div>`;
+  put($('scene'), h);
+}
+$('scene').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.robot) post('/sim/robot', {robot: b.dataset.robot, action: b.dataset.action});
+  else if (b.dataset.fault) post('/sim/fault', JSON.parse(b.dataset.fault));
+});
+$('scene').addEventListener('change', e => { if (e.target.id === 'scene-dev') { sceneDevice = e.target.value; renderScene(); } });
+
+// ---------- 评分 ----------
+const ev = r => r ? `<a data-seq="${r.seq}">#${r.seq}</a>` : '';
+function renderScore() {
+  const c = S.checks;
+  const res = x => x.pass ? `${dot('good', '通过')} <span class="muted">${ev(x.evidence)}</span>` : dot('off', '未通过') + (x.hint ? `<div class="hint">${esc(x.hint)}</div>` : '');
+  let h = `<h4>任务1 · 设备接入<span class="r">${c.score.official} / ${c.score.officialTotal}</span></h4>
+    <table class="nw"><thead><tr><th>编号</th><th>检查点</th><th>结果</th></tr></thead><tbody>`
+    + c.official.map(x => `<tr><td class="mono">${x.id}</td><td title="${esc(x.rule)}">${esc(x.name)}</td><td>${res(x)}</td></tr>`).join('') + `</tbody></table>`;
+  h += `<details id="pre"${preOpen ? ' open' : ''}><summary>T1-B-01 ~ 12（评分表未公布，推测项）${c.score.pre} / ${c.score.preTotal}</summary>
+    <table class="nw"><tbody>${c.pre.map(x => `<tr><td class="mono" style="width:44px">${x.id.replace('推测-', 'P')}</td><td>${esc(x.name)}</td><td>${x.pass ? dot('good', '通过') + ' <span class="muted">' + ev(x.evidence) + '</span>' : dot('off', '未通过')}</td></tr>`).join('')}</tbody></table></details>`;
+  h += `<h4>任务3 · Labillion 接口</h4><table class="nw"><thead><tr><th>阶段</th><th>内容</th><th>时间段</th><th>调用</th></tr></thead><tbody>`
+    + c.bl.map(x => `<tr><td>${dot(x.pass ? 'good' : 'off', x.id)}</td><td>${esc(x.name)}</td>
+      <td class="num">${x.window ? esc(x.window[0] + ' – ' + x.window[1]) : '<span class="muted">—</span>'}</td><td class="num">${x.calls}</td></tr>`).join('') + `</tbody></table>`;
+  h += `<h4>任务3 · 设备口控制</h4><table class="nw"><thead><tr><th>阶段</th><th>内容</th><th>完成</th></tr></thead><tbody>`
+    + c.bc.map(x => `<tr><td>${dot(x.pass ? 'good' : 'off', x.id)}</td><td>${esc(x.name)}
+      ${x.last ? `<div class="hint">指令 ${ev(x.last.command)} · 到位 ${ev(x.last.physical)} · 核验 ${ev(x.last.verify)}</div>` : ''}
+      ${x.hint ? `<div class="hint">${esc(x.hint)}</div>` : ''}</td><td class="num">${x.count} 次</td></tr>`).join('') + `</tbody></table>`;
+  const p = c.pujiang, run = {running: '运行中', stopping: '终止中', completed: '正常完成', stopped: '被终止', aborted: '被中止'}[p.run] || '未运行';
+  h += `<h4>浦江调用流程</h4><div class="kv"><span>上料</span><span>${p.loaded} 件${p.inPlatform.length ? '（平台内 ' + p.inPlatform.map(esc).join('、') + '）' : ''}</span>
+    <span>运行</span><span>${run}</span><span>数据推送</span><span>${esc(p.dataPush || '—')}</span>
+    <span>下料</span><span>${p.takenOut.length} 件${p.stuck.length ? '，卸载后无处放：' + p.stuck.map(esc).join('、') : ''}</span>
+    <span>整体结束</span><span>${p.finished ? dot('good', '是') : dot('off', '否')}</span></div>`;
+  put($('score'), h);
+}
+$('score').addEventListener('toggle', e => { if (e.target.id === 'pre') preOpen = e.target.open; }, true);
+
+// ---------- 调用记录 ----------
+const KIND = {labillion: 'Labillion', rail: '交互口', rail_result: '交互口结果', callback: '回调', data_push: '数据推送',
+              platform: '平台', physical: '物理', sensor: '相机核验', violation: '违规', sim: '测试台'};
+const FILTERS = [['all', '全部'], ['labillion', 'Labillion'], ['rail', '交互口'], ['callback', '回调'], ['physical', '物理'], ['sim', '测试台']];
+const FKINDS = {labillion: ['labillion'], rail: ['rail', 'rail_result'], callback: ['callback', 'data_push'],
+                physical: ['physical', 'sensor', 'violation', 'platform'], sim: ['sim']};
+$('log-filter').innerHTML = FILTERS.map(([k, t]) => `<button data-f="${k}">${t}</button>`).join('');
+const markFilter = () => document.querySelectorAll('#log-filter button').forEach(b => b.classList.toggle('on', b.dataset.f === logFilter));
+markFilter();
+$('log-filter').addEventListener('click', e => {
+  const b = e.target.closest('button[data-f]');
+  if (b) { logFilter = b.dataset.f; markFilter(); fillLog(); }
+});
+const visible = e => logFilter === 'all' || (FKINDS[logFilter] || []).includes(e.kind);
+function failed(e) {
+  if (e.kind === 'labillion') return e.status !== 200 || !e.ok;
+  if (e.kind === 'rail' || e.kind === 'rail_result') return e.resp && e.resp.ExecuteStatus !== 0;
+  if (e.kind === 'callback' || e.kind === 'data_push') return e.ok === false;
+  return e.kind === 'violation';
+}
+function rowHtml(e) {
+  return `<tr class="ev" id="ev-${e.seq}" data-row="${e.seq}"><td class="num">#${e.seq}</td><td class="num">${hmsms(e.time)}</td>
+    <td class="k-${e.kind}">${KIND[e.kind] || e.kind}</td><td class="${failed(e) ? 'bad' : ''}">${esc(e.summary || '')}</td></tr>`
+    + (openRows.has(e.seq) ? detailHtml(e) : '');
+}
+function detailHtml(e) {
+  const parts = [];
+  if (e.hints && e.hints.length) parts.push(['规范提示', e.hints.join('\n')]);
+  if (e.headers) parts.push(['请求头', e.headers]);
+  if (e.method && e.path) parts.push(['请求', `${e.method} ${e.path}`]);
+  if (e.url) parts.push(['地址', e.url]);
+  if ('req' in e) parts.push(['请求体', e.req]);
+  if ('resp' in e) parts.push([`响应${e.status ? '（HTTP ' + e.status + '）' : ''}`, e.resp]);
+  if (e.respText) parts.push(['对方响应', e.respText]);
+  if (!parts.length) parts.push(['事件', e]);
+  return `<tr class="detail" id="evd-${e.seq}"><td></td><td colspan="3">${parts.map(([k, v]) => `<div class="lbl">${esc(k)}</div><pre class="console">${esc(pretty(v))}</pre>`).join('')}
+    <div class="lbl">${esc(e.time)}${e.tsResp ? ' · 耗时 ' + Math.round((e.tsResp - e.ts) * 1000) + ' ms' : ''}</div></td></tr>`;
+}
+function fillLog() { $('log-body').innerHTML = events.filter(visible).reverse().map(rowHtml).join(''); }
+function addLog(fresh) {
+  const add = fresh.filter(visible);
+  if (add.length) $('log-body').insertAdjacentHTML('afterbegin', add.reverse().map(rowHtml).join(''));
+}
+$('log-body').addEventListener('click', e => {
+  if (e.target.closest('pre')) return;
+  const tr = e.target.closest('tr[data-row]');
+  if (!tr) return;
+  const seq = Number(tr.dataset.row), d = $('evd-' + seq);
+  if (d) { d.remove(); openRows.delete(seq); return; }
+  const item = events.find(x => x.seq === seq);
+  if (item) { openRows.add(seq); tr.insertAdjacentHTML('afterend', detailHtml(item)); }
+});
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-seq]');
+  if (!a) return;
+  const seq = Number(a.dataset.seq);
+  setBench('log');
+  if (logFilter !== 'all') { logFilter = 'all'; markFilter(); fillLog(); }
+  const row = $('ev-' + seq);
+  if (!row) { toast('这条记录已不在页面上'); return; }
+  if (!$('evd-' + seq)) row.click();
+  row.scrollIntoView({block: 'center'});
+  row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1500);
+});
+
+// ---------- 设置 ----------
+function renderSettings() {
+  const c = S.config, host = location.hostname, p = c.ports, scheme = p.labillionCertFile ? 'https' : 'http';
+  const lab = `${scheme}://${host}:${p.labillionPort}`, nuc = `http://${host}:${p.railPort}`;
+  const rows = [
+    ['Labillion', `<span class="mono">${esc(lab)}/api/automation/v1</span>　<a href="${esc(lab)}/docs" target="_blank">接口说明</a>`],
+    ['Platform', `<span class="mono">${esc(c.platform)}</span>`],
+    ['登录', `<span class="mono">tenantId ${esc(c.tenantId)}<br>${esc(c.user)} / ${esc(c.password)}</span>`],
+    ['运行', `<span class="mono">runName ${esc(c.runName)} · process ${esc(c.process)}</span>`],
+    ['交互口', `<span class="mono">${esc(nuc)}/api/BusFrame/System/Post</span>　<a href="${esc(nuc)}/docs" target="_blank">接口说明</a>`],
+    ['DeviceId', `<span class="mono">${esc(c.railDeviceId)}</span>`],
+    ['点位', c.positions.map(x => `CursorIndex ${x.cursorIndex} = ${esc(x.name)}`).join('，')],
+    ['异步回调', `<span class="mono">http://&lt;智能体 IP&gt;:${c.callbackPort}/api/OnResponse、/api/OnError</span>`],
+    ['仿真相机', `<span class="mono">GET http://${esc(host)}:${p.consolePort}/sim/port</span>`],
+  ];
+  put($('conn'), rows.map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join(''));
+  const set = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
+  set('s-mode', S.settings.mode); set('s-speed', String(S.settings.speed)); set('s-code', String(S.settings.successCode));
+  set('s-cb', S.settings.callbackBaseUrl); set('s-push', S.settings.dataPushUrl);
+  $('s-cb').placeholder = `留空 = http://<客户端 IP>:${c.callbackPort}`;
+  $('s-push').placeholder = '流程正常结束后推送运行数据，留空不推送';
+  $('s-strict').checked = S.settings.strictHeaders;
+}
+$('s-mode').onchange = e => post('/sim/settings', {mode: e.target.value});
+$('s-speed').onchange = e => post('/sim/settings', {speed: Number(e.target.value)});
+$('s-code').onchange = e => post('/sim/settings', {successCode: Number(e.target.value)});
+$('s-strict').onchange = e => post('/sim/settings', {strictHeaders: e.target.checked});
+document.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
+  const key = b.dataset.save, input = key === 'callbackBaseUrl' ? $('s-cb') : $('s-push');
+  post('/sim/settings', {[key]: input.value});
+});
+
+// ---------- 顶部按钮 ----------
+$('b-run').onclick = () => (S && S.demo.running ? post('/sim/demo/stop') : startDemo());
+$('b-reset').onclick = () => { if (confirm('重置到初始状态？设备下线、测试耗材清空、计时归零。')) post('/sim/reset', {}); };
+const benchHidden = on => { document.body.classList.toggle('bench-hidden', on); store.set('benchHidden', on ? '1' : ''); };
+$('b-hide').onclick = () => benchHidden(true);
+$('b-open').onclick = () => benchHidden(false);
+if (store.get('benchHidden', '') || q.get('hide') === '1') benchHidden(true);
+
+// ---------- 刷新 ----------
+const BENCH = {demo: renderDemo, manual: renderManual, scene: renderScene, score: renderScore, log: () => {}, settings: renderSettings};
+function renderBench() { renderHead(); BENCH[ui.bench](); }
+
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    const s = await (await fetch(`/sim/state?since=${lastSeq}`)).json();
+    if (s.round.id !== roundId) { roundId = s.round.id; events = []; openRows.clear(); $('log-body').innerHTML = ''; }
+    const seen = new Set(events.map(e => e.seq));
+    const fresh = s.events.filter(e => e.round === roundId && !seen.has(e.seq));
+    const late = events.length && fresh.some(e => e.seq < events[events.length - 1].seq);
+    events = events.concat(fresh).sort((a, b) => a.seq - b.seq).slice(-2000);
+    lastSeq = s.lastSeq;
+    S = s;
+    renderLab(); renderNuc(); renderBench();
+    if (late) fillLog(); else addLog(fresh);
+  } catch (err) {
+    put($('b-time'), '<span class="bad">连不上仿真台</span>');
+  } finally { polling = false; }
+}
+
+buildManual();
+showBench();
+poll();
+setInterval(poll, 600);
+</script>
+</body>
+</html>
